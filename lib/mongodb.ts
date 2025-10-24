@@ -27,6 +27,10 @@ export async function getMongoDb(): Promise<Db> {
     db.collection('users').createIndex({ address: 1 }, { unique: true }),
     db.collection('users').createIndex({ username: 1 }, { unique: true, sparse: true }),
     db.collection('activity').createIndex({ address: 1, createdAt: -1 }),
+    // Messages collection indexes
+    db.collection('messages').createIndex({ messageId: 1 }, { unique: true }),
+    db.collection('messages').createIndex({ sender: 1, timestamp: -1 }),
+    db.collection('messages').createIndex({ timestamp: -1 }),
   ])
 
   return db

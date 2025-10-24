@@ -320,7 +320,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const newCount = await contract.getTotalMessageCount()
         setTotalMessageCount(Number(newCount))
-        
+
         // Get the actual message from blockchain to update with correct messageId and timestamp
         const latestMessages = await contract.getMessages(Number(newCount) - 1, 1)
         if (latestMessages.length > 0) {
@@ -336,6 +336,25 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             }
             return msg
           }))
+
+          // Save message to MongoDB for persistent storage and analytics
+          try {
+            await fetch('/api/messages', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                messageId: Number(confirmedMsg.messageId),
+                sender: confirmedMsg.sender,
+                content: confirmedMsg.content,
+                timestamp: Number(confirmedMsg.timestamp),
+                transactionHash: tx.hash
+              })
+            })
+            console.log('✅ Message saved to MongoDB')
+          } catch (dbError) {
+            console.error('Failed to save message to MongoDB:', dbError)
+            // Don't throw - message is already on blockchain
+          }
         }
       } catch (updateError) {
         console.error('Error updating message details after confirmation:', updateError)
