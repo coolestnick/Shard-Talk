@@ -46,13 +46,24 @@ const config = getDefaultConfig({
   ssr: true, // Enable SSR support
 })
 
-// Create query client
+// Create query client with aggressive error handling
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 5 * 60 * 1000,
+      retry: (failureCount, error: any) => {
+        // Don't retry on 4xx or 5xx errors from the server
+        if (error?.status >= 400 && error?.status < 600) {
+          return false
+        }
+        // Only retry once for network errors
+        return failureCount < 1
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      cacheTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnMount: false,
+      refetchOnReconnect: false,
     },
   },
 })
