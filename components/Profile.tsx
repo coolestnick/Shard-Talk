@@ -17,24 +17,13 @@ const Profile: React.FC<ProfileProps> = ({ account, onUsernameChange, onDisconne
   const [tempUsername, setTempUsername] = useState('')
   const [isLoading, setIsLoading] = useState(false)
 
-  // Load username from backend on mount
+  // Disabled: No longer loading usernames from database
   useEffect(() => {
-    const load = async () => {
-      try {
-        const res = await fetch(`/api/users?address=${account.toLowerCase()}`, { cache: 'no-store' })
-        if (res.ok) {
-          const data = await res.json()
-          const u = data?.user
-          if (u?.username) {
-            setUsername(u.username)
-            onUsernameChange(u.username)
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load username', e)
-      }
-    }
-    load()
+    // const load = async () => {
+    //   // Disabled: Not fetching usernames from database anymore
+    // }
+    // load()
+
     // Listen for edit requests from parent UI
     const handleEdit = (e: Event) => {
       const detail = (e as CustomEvent).detail as { username?: string }
@@ -46,36 +35,15 @@ const Profile: React.FC<ProfileProps> = ({ account, onUsernameChange, onDisconne
   }, [account, onUsernameChange])
 
   const handleSaveUsername = async () => {
+    // Disabled: Not saving usernames to database anymore
     if (!tempUsername.trim()) return
-    
-    setIsLoading(true)
-    try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: account, username: tempUsername.trim() })
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Failed to save username')
-      }
-      setUsername(tempUsername.trim())
-      onUsernameChange(tempUsername.trim())
-      setIsEditing(false)
-      setTempUsername('')
-      if (onClose) onClose()
-      // log activity
-      fetch('/api/activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: account, type: 'update_username', metadata: { username: tempUsername.trim() } })
-      }).catch(() => {})
-    } catch (error) {
-      console.error('Error saving username:', error)
-      alert((error as Error).message)
-    } finally {
-      setIsLoading(false)
-    }
+
+    // Just update local state, no database call
+    setUsername(tempUsername.trim())
+    onUsernameChange(tempUsername.trim())
+    setIsEditing(false)
+    setTempUsername('')
+    if (onClose) onClose()
   }
 
   const handleCancel = () => {

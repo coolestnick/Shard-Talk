@@ -13,22 +13,12 @@ export default function Home() {
   const { connect, connectors } = useConnect()
   const { disconnect } = useDisconnect()
 
-  useEffect(() => {
-    if (isConnected && address) {
-      // Log activity and ensure user exists
-      fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: address.toLowerCase() }),
-      }).catch(() => {})
-
-      fetch('/api/activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: address.toLowerCase(), type: 'connect' }),
-      }).catch(() => {})
-    }
-  }, [isConnected, address])
+  // Disabled: No longer tracking user activity in database
+  // useEffect(() => {
+  //   if (isConnected && address) {
+  //     // Disabled: Not logging to database anymore
+  //   }
+  // }, [isConnected, address])
 
   // Get provider from window.ethereum
   const getProvider = () => {

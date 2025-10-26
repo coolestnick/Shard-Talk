@@ -21,32 +21,18 @@ const WalletConnect: React.FC = () => {
   // Shardeum EVM Testnet (Mezame) Chain ID
   const SHARDEUM_CHAIN_ID = 8119
 
-  useEffect(() => {
-    if (isConnected && address) {
-      loadUsername()
-    } else {
-      setUsername('')
-    }
-  }, [isConnected, address])
+  // Disabled: No longer loading usernames from database
+  // useEffect(() => {
+  //   if (isConnected && address) {
+  //     loadUsername()
+  //   } else {
+  //     setUsername('')
+  //   }
+  // }, [isConnected, address])
 
-  const loadUsername = async () => {
-    try {
-      const res = await fetch(`/api/users?address=${address!.toLowerCase()}`, { 
-        cache: 'no-store' 
-      })
-      if (res.ok) {
-        const data = await res.json()
-        const u = data?.user
-        if (u?.username) {
-          setUsername(u.username)
-        } else {
-          setUsername('')
-        }
-      }
-    } catch (e) {
-      console.error('Failed to load username', e)
-    }
-  }
+  // const loadUsername = async () => {
+  //   // Disabled: Not fetching from database anymore
+  // }
 
   const openEdit = () => {
     setTempUsername(username || '')
@@ -59,42 +45,14 @@ const WalletConnect: React.FC = () => {
   }
 
   const saveUsername = async () => {
+    // Disabled: Not saving usernames to database anymore
     const trimmed = tempUsername.trim()
     if (!address || !trimmed) return
-    
-    setIsSaving(true)
-    try {
-      const res = await fetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: address, username: trimmed })
-      })
-      
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Failed to save username')
-      }
-      
-      setUsername(trimmed)
-      setIsEditing(false)
-      setTempUsername('')
-      
-      // Log activity
-      fetch('/api/activity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          address: address, 
-          type: 'update_username', 
-          metadata: { username: trimmed } 
-        })
-      }).catch(() => {})
-    } catch (e) {
-      console.error(e)
-      alert((e as Error).message)
-    } finally {
-      setIsSaving(false)
-    }
+
+    // Just update local state, no database call
+    setUsername(trimmed)
+    setIsEditing(false)
+    setTempUsername('')
   }
 
   const handleSwitchToShardeum = () => {

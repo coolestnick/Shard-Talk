@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMongoDb } from '@/lib/mongodb'
 
+/**
+ * Messages API Endpoint
+ *
+ * FRONTEND USAGE:
+ * - Only POST method is used by the frontend to store messages after blockchain confirmation
+ * - Frontend does NOT call GET to avoid unnecessary database reads
+ *
+ * EXTERNAL INTEGRATIONS:
+ * - GET endpoint is available for external integrations and analytics
+ * - Can be used to query message count and retrieve message history
+ */
+
 // Message type definition
 interface Message {
   messageId: number
@@ -12,6 +24,7 @@ interface Message {
 }
 
 // GET /api/messages - Fetch messages by address or get message count
+// NOTE: Not called by frontend, available for external integrations only
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
