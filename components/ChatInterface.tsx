@@ -12,20 +12,33 @@ interface ChatInterfaceProps {
 }
 
 const ChatInterface: React.FC<ChatInterfaceProps> = ({ account, provider }) => {
-  const { messages, loading, error, sendMessage, loadMoreMessages, hasMoreMessages, checkCooldown, networkStatus, switchToShardeum } = useChat()
+  const { messages, loading, error, sendMessage, loadMoreMessages, hasMoreMessages, checkCooldown, networkStatus, switchToShardeum, cooldownRemaining } = useChat()
   const [isTyping, setIsTyping] = useState(false)
   const [showNewMessagesButton, setShowNewMessagesButton] = useState(false)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [lastMessageCount, setLastMessageCount] = useState(0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Optimized cooldown check - only poll when cooldown is active
   useEffect(() => {
+    if (!account) return
+
     checkCooldown(account)
-    const interval = setInterval(() => {
-      checkCooldown(account)
-    }, 2000)
-    return () => clearInterval(interval)
-  }, [account, checkCooldown])
+
+    // Only set up interval if cooldown is active
+    let interval: NodeJS.Timeout | null = null
+
+    if (cooldownRemaining > 0) {
+      // Poll every 5 seconds instead of 2 when cooldown is active
+      interval = setInterval(() => {
+        checkCooldown(account)
+      }, 5000)
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
+  }, [account, checkCooldown, cooldownRemaining])
 
   // Enhanced real-time message handling like WhatsApp
   useEffect(() => {

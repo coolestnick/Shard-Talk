@@ -43,13 +43,40 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [hasMoreMessages, setHasMoreMessages] = useState(true)
   const [cooldownRemaining, setCooldownRemaining] = useState(0)
   const [networkStatus, setNetworkStatus] = useState<'connected' | 'wrong-network' | 'disconnected' | 'checking'>('checking')
-  
+
   // Refs to store event listeners and intervals for cleanup
   const eventListenerRef = useRef<any>(null)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const pendingCheckIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const contractRef = useRef<ethers.Contract | null>(null)
   const providerRef = useRef<ethers.BrowserProvider | null>(null)
+
+  // Helper function to get or create provider and contract (reuse instances)
+  const getProviderAndContract = async (withSigner: boolean = false) => {
+    if (typeof window === 'undefined' || !window.ethereum) {
+      throw new Error('MetaMask not installed')
+    }
+
+    // Reuse existing provider if available
+    if (!providerRef.current) {
+      providerRef.current = new ethers.BrowserProvider(window.ethereum)
+    }
+
+    const provider = providerRef.current
+
+    if (withSigner) {
+      const signer = await provider.getSigner()
+      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI.abi, signer)
+      return { provider, contract, signer }
+    }
+
+    // Reuse existing contract if available
+    if (!contractRef.current) {
+      contractRef.current = new ethers.Contract(CONTRACT_ADDRESS, contractABI.abi, provider)
+    }
+
+    return { provider, contract: contractRef.current }
+  }
 
   const loadMessages = async (start: number = 0, count: number = 15, skipLoadingState: boolean = false) => {
     try {
@@ -413,14 +440,15 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
+  // Optimized: Reuses provider/contract instances
   const checkCooldown = async (address: string) => {
     try {
       if (typeof window === 'undefined' || !window.ethereum) {
         return
       }
 
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      
+      const { provider, contract } = await getProviderAndContract()
+
       // Check network connection
       try {
         const network = await provider.getNetwork()
@@ -430,9 +458,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch (networkError) {
         return
       }
-      
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI.abi, provider)
-      
+
       try {
         const cooldown = await contract.getCooldownRemaining(address)
         setCooldownRemaining(Number(cooldown))
@@ -513,29 +539,35 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     await setupEventListeners()
   }
 
+  // Optimized: Only check pending messages when there are actually pending messages
   const checkPendingMessages = async () => {
     try {
       if (typeof window === 'undefined' || !window.ethereum) {
         return
       }
 
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI.abi, provider)
-      
+      // Early return if no pending messages
+      const hasPending = messages.some(msg => msg.isPending)
+      if (!hasPending) {
+        return
+      }
+
+      const { contract } = await getProviderAndContract()
+
       const totalCount = await contract.getTotalMessageCount()
       if (totalCount === 0) return
-      
+
       const lastMessages = await contract.getMessages(Math.max(0, Number(totalCount) - 10), 10)
-      
+
       setMessages(prev => {
         const updatedMessages = prev.map(msg => {
           if (msg.isPending) {
             const confirmedMessage = lastMessages.find(
-              (blockchainMsg: any) => 
+              (blockchainMsg: any) =>
                 blockchainMsg.sender.toLowerCase() === msg.sender.toLowerCase() &&
                 blockchainMsg.content === msg.content
             )
-            
+
             if (confirmedMessage) {
               return {
                 ...msg,
@@ -547,7 +579,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }
           return msg
         })
-        
+
         return updatedMessages.filter(msg => {
           if (msg.isPending) {
             const messageAge = Math.floor(Date.now() / 1000) - msg.timestamp
@@ -635,59 +667,56 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }
 
-  // CRITICAL FIX: Enhanced polling for new users and backup
+  // Optimized polling - reduced frequency, reuses provider/contract
   const setupPolling = () => {
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current)
     }
-    
-    console.log('⏰ Setting up enhanced polling every 3 seconds')
-    
+
+    console.log('⏰ Setting up optimized polling every 15 seconds')
+
     pollingIntervalRef.current = setInterval(async () => {
       try {
         if (typeof window === 'undefined' || !window.ethereum || networkStatus !== 'connected') {
           return
         }
 
-        const provider = new ethers.BrowserProvider(window.ethereum)
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI.abi, provider)
-        
+        const { contract } = await getProviderAndContract()
+
         // Get current message count
         const currentCount = await contract.getTotalMessageCount()
-        
+
         // If we have new messages, fetch and add them
         if (Number(currentCount) > totalMessageCount) {
           const newMessageCount = Number(currentCount) - totalMessageCount
           console.log(`📥 Polling found ${newMessageCount} new messages`)
-          
+
           // Get the new messages without showing loading spinner
           try {
-            const provider = new ethers.BrowserProvider(window.ethereum)
-            const contract = new ethers.Contract(CONTRACT_ADDRESS, contractABI.abi, provider)
             const newMessages = await contract.getMessages(totalMessageCount, newMessageCount)
-            
+
             const formattedNewMessages: Message[] = newMessages.map((msg: any) => ({
               sender: msg.sender,
               timestamp: Number(msg.timestamp),
               content: msg.content,
               messageId: Number(msg.messageId)
             }))
-            
+
             setMessages(prev => {
               // Filter out messages we already have
               const existingMessageIds = new Set(prev.map(msg => msg.messageId))
               const trulyNewMessages = formattedNewMessages.filter(msg => !existingMessageIds.has(msg.messageId))
-              
+
               if (trulyNewMessages.length > 0) {
                 console.log('✅ New messages added via polling:', trulyNewMessages.length)
                 // Sort messages by messageId to maintain order
                 const updatedMessages = [...prev, ...trulyNewMessages].sort((a, b) => a.messageId - b.messageId)
                 return updatedMessages
               }
-              
+
               return prev
             })
-            
+
             // Update total count
             setTotalMessageCount(Number(currentCount))
           } catch (pollingError) {
@@ -697,7 +726,7 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } catch (error) {
         console.error('❌ Error during polling:', error)
       }
-    }, 3000) // Poll every 3 seconds for faster updates
+    }, 15000) // Optimized: Poll every 15 seconds instead of 3
   }
 
   // Initialize chat with improved real-time capabilities
@@ -716,11 +745,11 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       // Check for any pending messages
       await checkPendingMessages()
-      
-      // Set up periodic check for pending messages
+
+      // Optimized: Check pending messages every 20 seconds (only runs if pending messages exist)
       pendingCheckIntervalRef.current = setInterval(() => {
         checkPendingMessages()
-      }, 10000)
+      }, 20000)
       
       console.log('✅ Chat initialization complete!')
     }
