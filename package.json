@@ -11,7 +11,8 @@
     "compile": "hardhat compile",
     "deploy": "hardhat run scripts/deploy.js --network shardeum",
     "test": "hardhat test",
-    "sync-messages": "node scripts/sync-messages.js"
+    "sync-messages": "node scripts/sync-messages.js",
+    "setup-indexes": "node scripts/setup-indexes.js"
   },
   "dependencies": {
     "@rainbow-me/rainbowkit": "^2.2.8",

@@ -295,12 +295,17 @@ export async function POST(request: NextRequest) {
         { upsert: true }
       )
 
+      const wasInserted = result.upsertedCount > 0
+      const wasUpdated = result.modifiedCount > 0
+
+      console.log(`✅ [POST /api/messages] MessageID ${messageId} from ${normalizedAddress}: ${wasInserted ? 'INSERTED' : wasUpdated ? 'UPDATED' : 'NO CHANGE'}`)
+
       return NextResponse.json({
         success: true,
         messageId,
-        inserted: result.upsertedCount > 0,
-        updated: result.modifiedCount > 0,
-        message: result.upsertedCount > 0 ? 'Message saved successfully' : 'Message updated successfully'
+        inserted: wasInserted,
+        updated: wasUpdated,
+        message: wasInserted ? 'Message saved successfully' : wasUpdated ? 'Message updated successfully' : 'Message already exists'
       })
     } catch (dbError: any) {
       console.error('Error saving message:', dbError)

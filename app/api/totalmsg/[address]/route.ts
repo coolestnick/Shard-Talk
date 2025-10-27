@@ -60,6 +60,8 @@ export async function GET(
         sender: normalizedAddress,
       })
 
+      console.log(`✅ [/api/totalmsg] Count for ${normalizedAddress}: ${totalMessages} messages`)
+
       return NextResponse.json(
         {
           success: true,
@@ -70,7 +72,10 @@ export async function GET(
           status: 200,
           headers: {
             'Content-Type': 'application/json',
-            'Cache-Control': 'public, s-maxage=10, stale-while-revalidate=30',
+            // No caching - always return fresh count
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0',
           },
         }
       )

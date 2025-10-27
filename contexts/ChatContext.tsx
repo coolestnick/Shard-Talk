@@ -360,23 +360,50 @@ export const ChatProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           }))
 
           // Save message to MongoDB for persistent storage and analytics
-          try {
-            await fetch('/api/messages', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                messageId: Number(confirmedMsg.messageId),
-                sender: confirmedMsg.sender,
-                content: confirmedMsg.content,
-                timestamp: Number(confirmedMsg.timestamp),
-                transactionHash: tx.hash
-              })
-            })
-            console.log('✅ Message saved to MongoDB')
-          } catch (dbError) {
-            console.error('Failed to save message to MongoDB:', dbError)
-            // Don't throw - message is already on blockchain
+          // Retry up to 3 times with exponential backoff
+          const saveToDatabase = async (retries = 3) => {
+            for (let i = 0; i < retries; i++) {
+              try {
+                const response = await fetch('/api/messages', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    messageId: Number(confirmedMsg.messageId),
+                    sender: confirmedMsg.sender,
+                    content: confirmedMsg.content,
+                    timestamp: Number(confirmedMsg.timestamp),
+                    transactionHash: tx.hash
+                  })
+                })
+
+                const data = await response.json()
+
+                if (response.ok && data.success) {
+                  console.log('✅ Message saved to MongoDB successfully')
+                  return true
+                } else {
+                  console.warn(`⚠️ Failed to save (attempt ${i + 1}/${retries}):`, data.error || response.statusText)
+                  if (i < retries - 1) {
+                    // Wait before retrying (exponential backoff: 1s, 2s, 4s)
+                    await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000))
+                  }
+                }
+              } catch (error) {
+                console.error(`❌ Error saving to MongoDB (attempt ${i + 1}/${retries}):`, error)
+                if (i < retries - 1) {
+                  await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000))
+                }
+              }
+            }
+            console.error('❌ Failed to save message to MongoDB after all retries')
+            return false
           }
+
+          // Don't await - save in background
+          saveToDatabase().catch(err => {
+            console.error('Final error saving to MongoDB:', err)
+            // Don't throw - message is already on blockchain
+          })
         }
       } catch (updateError) {
         console.error('Error updating message details after confirmation:', updateError)
