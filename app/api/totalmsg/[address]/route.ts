@@ -11,11 +11,12 @@ import { getMongoDb } from '@/lib/mongodb'
  * Returns: { success: true, address: "0x...", totalMessages: 5 }
  */
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { address: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ address: string }> }
 ) {
   try {
-    const address = params.address
+    // In Next.js 15, params is a Promise
+    const { address } = await params
 
     // Validate address format
     if (!address || !address.match(/^0x[a-fA-F0-9]{40}$/)) {
